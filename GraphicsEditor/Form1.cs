@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
 using System.Linq;
 using System.Reflection.Emit;
 using System.Text;
@@ -13,10 +15,10 @@ namespace GraphicsEditor
 {
     public partial class Form1 : Form
     {
-        private Bitmap canvas;          // холст, на котором рисуем
-        private Graphics g;             // графика холста
-        private bool isDrawing = false; // зажата ли мышь
-        private Point lastPoint;        // предыдущая точка
+        private Bitmap canvas;
+        private Graphics g;
+        private bool isDrawing = false;
+        private Point lastPoint;
         private Color currentColor = Color.Black;
 
         public Form1()
@@ -27,15 +29,13 @@ namespace GraphicsEditor
 
         private void SetupCanvas()
         {
-            // создаём bitmap размером с pictureBox
             canvas = new Bitmap(pictureBox.Width, pictureBox.Height);
             g = Graphics.FromImage(canvas);
-            g.Clear(Color.White);           // белый фон
+            g.Clear(Color.White);
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             pictureBox.Image = canvas;
         }
 
-        // Начало рисования
         private void pictureBox1_MouseDown(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left)
@@ -45,7 +45,6 @@ namespace GraphicsEditor
             }
         }
 
-        // Процесс рисования
         private void pictureBox1_MouseMove(object sender, MouseEventArgs e)
         {
             if (!isDrawing) return;
@@ -57,16 +56,14 @@ namespace GraphicsEditor
                 g.DrawLine(pen, lastPoint, e.Location);
             }
             lastPoint = e.Location;
-            pictureBox.Invalidate(); // перерисовать
+            pictureBox.Invalidate();
         }
 
-        // Конец рисования
         private void pictureBox1_MouseUp(object sender, MouseEventArgs e)
         {
             isDrawing = false;
         }
 
-        // Выбор цвета
         private void btnColor_Click(object sender, EventArgs e)
         {
             using (ColorDialog cd = new ColorDialog())
@@ -79,20 +76,17 @@ namespace GraphicsEditor
             }
         }
 
-        // Очистка
         private void btnClear_Click(object sender, EventArgs e)
         {
             g.Clear(Color.White);
             pictureBox.Invalidate();
         }
 
-        // Изменение толщины
         private void trackBarSize_Scroll(object sender, EventArgs e)
         {
             label1.Text = "Толщина: " + trackBarSize.Value;
         }
 
-        // При изменении размера формы — пересоздать холст
         private void pictureBox1_Resize(object sender, EventArgs e)
         {
             if (pictureBox.Width <= 0 || pictureBox.Height <= 0) return;
@@ -108,6 +102,75 @@ namespace GraphicsEditor
             g = Graphics.FromImage(canvas);
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             pictureBox.Image = canvas;
+        }
+
+        private void btnSave_Click(object sender, EventArgs e)
+        {
+            using (SaveFileDialog sfd = new SaveFileDialog())
+            {
+                sfd.Title = "Сохранить изображение";
+                sfd.Filter = "PNG (*.png)|*.png|JPEG (*.jpg)|*.jpg|BMP (*.bmp)|*.bmp";
+                sfd.DefaultExt = "png";
+                sfd.FileName = "рисунок";
+
+                if (sfd.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        ImageFormat format = ImageFormat.Png;
+                        string ext = Path.GetExtension(sfd.FileName).ToLower();
+
+                        if (ext == ".jpg" || ext == ".jpeg") format = ImageFormat.Jpeg;
+                        else if (ext == ".bmp") format = ImageFormat.Bmp;
+
+                        canvas.Save(sfd.FileName, format);
+                        MessageBox.Show("Изображение сохранено!", "Успех",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Ошибка сохранения: " + ex.Message, "Ошибка",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+        private void btnOpen_Click(object sender, EventArgs e)
+        {
+            if (MessageBox.Show("Текущий рисунок будет заменён. Продолжить?",
+            "Открыть файл", MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Title = "Открыть изображение";
+                ofd.Filter = "Изображения (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp|Все файлы (*.*)|*.*";
+
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        Bitmap loaded;
+                        using (var temp = new Bitmap(ofd.FileName))
+                        {
+                            loaded = new Bitmap(temp);
+                        }
+
+                        g.Clear(Color.White);
+                        g.DrawImage(loaded, 0, 0);
+                        loaded.Dispose();
+
+                        pictureBox.Invalidate();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Ошибка загрузки: " + ex.Message, "Ошибка",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
         }
     }
 }
